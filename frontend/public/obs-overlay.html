@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cricket Score Overlay</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: transparent;
+      color: white;
+      overflow: hidden;
+    }
+
+    .scoreboard {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.95), rgba(0, 0, 0, 0.95));
+      border-radius: 12px;
+      padding: 20px;
+      min-width: 500px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(220, 38, 38, 0.3);
+    }
+
+    .match-header {
+      text-align: center;
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .teams {
+      font-size: 18px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .match-info {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 5px;
+    }
+
+    .score-display {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 15px 0;
+    }
+
+    .score-main {
+      font-size: 48px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .overs {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .run-rate {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .batsmen {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 15px 0;
+    }
+
+    .batsman {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 8px;
+      border-left: 3px solid #dc2626;
+    }
+
+    .batsman-name {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .batsman-stats {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .current-bowler {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 8px;
+      border-left: 3px solid #3b82f6;
+      margin-top: 10px;
+    }
+
+    .bowler-name {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .bowler-stats {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .recent-balls {
+      display: flex;
+      gap: 5px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+
+    .ball {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .ball.six { background: #dc2626; }
+    .ball.four { background: #f59e0b; }
+    .ball.wicket { background: #ef4444; border-color: #fff; }
+    .ball.dot { background: #22c55e; }
+    .ball.runs { background: #3b82f6; }
+    .ball.extra { background: #8b5cf6; }
+
+    .live-indicator {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #ef4444;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 18px;
+    }
+
+    .error {
+      text-align: center;
+      padding: 40px;
+      color: #ef4444;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay" class="scoreboard">
+    <div class="loading">Loading match data...</div>
+  </div>
+
+  <script>
+    // Get match ID from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const matchId = urlParams.get('match');
+    const API_URL = urlParams.get('api') || 'http://localhost:5000';
+
+    if (!matchId) {
+      document.getElementById('overlay').innerHTML = '<div class="error">No match ID provided. Use: ?match=1</div>';
+    } else {
+      // Fetch and update score every 2 seconds
+      setInterval(updateScore, 2000);
+      updateScore();  // Initial load
+    }
+
+    async function updateScore() {
+      try {
+        const response = await fetch(`${API_URL}/api/overlay/match/${matchId}/live`);
+        if (!response.ok) throw new Error('Failed to fetch');
+
+        const data = await response.json();
+        renderScoreboard(data);
+      } catch (error) {
+        console.error('Error fetching score:', error);
+        document.getElementById('overlay').innerHTML = '<div class="error">Failed to load match data</div>';
+      }
+    }
+
+    function renderScoreboard(data) {
+      const { match, innings, batsmen, current_bowler, recent_balls } = data;
+
+      if (!innings) {
+        document.getElementById('overlay').innerHTML = '<div class="loading">Match not started</div>';
+        return;
+      }
+
+      let html = '';
+
+      // Live indicator
+      if (match.status === 'in_progress') {
+        html += '<div class="live-indicator">● LIVE</div>';
+      }
+
+      // Match header
+      html += `
+        <div class="match-header">
+          <div class="teams">${match.home_team} vs ${match.away_team}</div>
+          <div class="match-info">${match.format}${match.venue ? ' • ' + match.venue : ''}</div>
+        </div>
+      `;
+
+      // Score display
+      html += `
+        <div class="score-display">
+          <div>
+            <div class="score-main">${innings.runs}/${innings.wickets}</div>
+            <div class="overs">Overs: ${innings.overs.toFixed(1)}</div>
+          </div>
+          <div style="text-align: right;">
+            <div class="run-rate">CRR: ${innings.current_run_rate}</div>
+            ${innings.required_run_rate ? `<div class="run-rate">RRR: ${innings.required_run_rate}</div>` : ''}
+          </div>
+        </div>
+      `;
+
+      // Batsmen
+      if (batsmen && batsmen.length > 0) {
+        html += '<div class="batsmen">';
+        batsmen.forEach(batter => {
+          html += `
+            <div class="batsman">
+              <div class="batsman-name">${batter.name}</div>
+              <div class="batsman-stats">
+                ${batter.runs_scored || 0} (${batter.balls_faced || 0}) • SR: ${batter.strike_rate || '0.00'}
+                ${batter.fours > 0 ? ` • 4s: ${batter.fours}` : ''}
+                ${batter.sixes > 0 ? ` • 6s: ${batter.sixes}` : ''}
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+      }
+
+      // Current bowler
+      if (current_bowler) {
+        html += `
+          <div class="current-bowler">
+            <div class="bowler-name">🎯 ${current_bowler.name}</div>
+            <div class="bowler-stats">
+              ${current_bowler.overs_bowled || 0} overs • ${current_bowler.wickets || 0}/${current_bowler.runs_conceded || 0}
+              • Eco: ${current_bowler.economy || '0.00'}
+            </div>
+          </div>
+        `;
+      }
+
+      // Recent balls
+      if (recent_balls && recent_balls.length > 0) {
+        html += '<div class="recent-balls">';
+        recent_balls.forEach(ball => {
+          let ballClass = 'dot';
+          let ballText = '•';
+
+          if (ball.is_wicket) {
+            ballClass = 'wicket';
+            ballText = 'W';
+          } else if (ball.runs === 6) {
+            ballClass = 'six';
+            ballText = '6';
+          } else if (ball.runs === 4) {
+            ballClass = 'four';
+            ballText = '4';
+          } else if (ball.is_extra) {
+            ballClass = 'extra';
+            ballText = ball.extra_type.substring(0, 2).toUpperCase();
+          } else if (ball.runs > 0) {
+            ballClass = 'runs';
+            ballText = ball.runs.toString();
+          }
+
+          html += `<div class="ball ${ballClass}">${ballText}</div>`;
+        });
+        html += '</div>';
+      }
+
+      document.getElementById('overlay').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

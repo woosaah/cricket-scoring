@@ -146,6 +146,15 @@ CREATE TABLE balls (
   extra_type VARCHAR(10) CHECK (extra_type IN ('wide', 'bye', 'legbye', 'noball')),
   extra_runs INTEGER DEFAULT 0,
   is_wicket BOOLEAN DEFAULT false,
+  -- Wagon Wheel data (shot location - optional)
+  wagon_wheel_x INTEGER,  -- X coordinate (-100 to 100, 0 = straight)
+  wagon_wheel_y INTEGER,  -- Y coordinate (0 to 100, distance from batter)
+  wagon_wheel_zone VARCHAR(20),  -- Zone name (e.g., 'cover', 'midwicket', 'fine_leg')
+  -- Pitch Map data (bowling line & length - optional)
+  pitch_line VARCHAR(20),  -- Line (e.g., 'off', 'middle', 'leg', 'wide_off', 'wide_leg')
+  pitch_length VARCHAR(20),  -- Length (e.g., 'yorker', 'full', 'good', 'short', 'bouncer')
+  pitch_x INTEGER,  -- X coordinate (0-100, 0=leg side, 50=middle, 100=off side)
+  pitch_y INTEGER,  -- Y coordinate (0-100, 0=bowler's end, 100=batter's end)
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { matches } from '../lib/api'
+import { matches, scoring } from '../lib/api'
 import { RefreshCw } from 'lucide-react'
+import WagonWheel from '../components/WagonWheel'
+import PitchMap from '../components/PitchMap'
 
 export default function LiveScorecard() {
   const { id } = useParams()
   const [scorecard, setScorecard] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [inningsData, setInningsData] = useState<any[]>([])
+  const [showWagonWheel, setShowWagonWheel] = useState<number | null>(null)
+  const [showPitchMap, setShowPitchMap] = useState<number | null>(null)
 
   useEffect(() => {
     loadScorecard()
@@ -27,6 +32,21 @@ export default function LiveScorecard() {
     try {
       const response = await matches.getScorecard(parseInt(id!))
       setScorecard(response.data)
+
+      // Load innings data with balls for visualizations
+      if (response.data.innings) {
+        const inningsWithBalls = await Promise.all(
+          response.data.innings.map(async (inning: any) => {
+            try {
+              const stateRes = await scoring.getInningsState(inning.id)
+              return { ...inning, balls: stateRes.data?.balls || [] }
+            } catch {
+              return { ...inning, balls: [] }
+            }
+          })
+        )
+        setInningsData(inningsWithBalls)
+      }
     } catch (error) {
       console.error('Error loading scorecard:', error)
     } finally {
@@ -189,6 +209,80 @@ export default function LiveScorecard() {
               </table>
             </div>
           </div>
+
+          {/* Visualizations */}
+          {inningsData[index] && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Wagon Wheel */}
+              <div className="card">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold">Wagon Wheel</h3>
+                  <button
+                    onClick={() =>
+                      setShowWagonWheel(showWagonWheel === index ? null : index)
+                    }
+                    className="text-sm text-primary hover:underline"
+                  >
+                    {showWagonWheel === index ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {showWagonWheel === index && (
+                  <div className="flex justify-center">
+                    <WagonWheel
+                      shots={
+                        inningsData[index].balls
+                          ?.filter(
+                            (b: any) =>
+                              b.wagon_wheel_x !== null && b.wagon_wheel_y !== null
+                          )
+                          .map((b: any) => ({
+                            x: b.wagon_wheel_x,
+                            y: b.wagon_wheel_y,
+                            runs: b.runs,
+                          })) || []
+                      }
+                      size={300}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Pitch Map */}
+              <div className="card">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="font-semibold">Pitch Map</h3>
+                  <button
+                    onClick={() =>
+                      setShowPitchMap(showPitchMap === index ? null : index)
+                    }
+                    className="text-sm text-primary hover:underline"
+                  >
+                    {showPitchMap === index ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                {showPitchMap === index && (
+                  <div className="flex justify-center">
+                    <PitchMap
+                      deliveries={
+                        inningsData[index].balls
+                          ?.filter(
+                            (b: any) => b.pitch_x !== null && b.pitch_y !== null
+                          )
+                          .map((b: any) => ({
+                            x: b.pitch_x,
+                            y: b.pitch_y,
+                            runs: b.runs,
+                            isWicket: b.is_wicket,
+                          })) || []
+                      }
+                      width={250}
+                      height={350}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ))}
 

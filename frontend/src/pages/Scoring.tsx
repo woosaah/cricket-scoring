@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { matches, teams, scoring } from '../lib/api'
-import { Undo } from 'lucide-react'
+import { Undo, Target } from 'lucide-react'
+import WagonWheel from '../components/WagonWheel'
+import PitchMap from '../components/PitchMap'
 
 export default function Scoring() {
   const { id } = useParams()
@@ -30,6 +32,20 @@ export default function Scoring() {
     dismissal_type: 'bowled',
     fielder_id: null,
   })
+
+  // Wagon Wheel & Pitch Map data (optional)
+  const [showVisualizationModal, setShowVisualizationModal] = useState(false)
+  const [wagonWheelData, setWagonWheelData] = useState<{
+    x: number
+    y: number
+    zone: string
+  } | null>(null)
+  const [pitchMapData, setPitchMapData] = useState<{
+    x: number
+    y: number
+    line: string
+    length: string
+  } | null>(null)
 
   useEffect(() => {
     loadMatch()
@@ -129,6 +145,19 @@ export default function Scoring() {
         non_striker_id: nonStriker.id,
         bowler_id: bowler.id,
         ...ballData,
+        // Optional wagon wheel data
+        ...(wagonWheelData && {
+          wagon_wheel_x: wagonWheelData.x,
+          wagon_wheel_y: wagonWheelData.y,
+          wagon_wheel_zone: wagonWheelData.zone,
+        }),
+        // Optional pitch map data
+        ...(pitchMapData && {
+          pitch_line: pitchMapData.line,
+          pitch_length: pitchMapData.length,
+          pitch_x: pitchMapData.x,
+          pitch_y: pitchMapData.y,
+        }),
         dismissal: ballData.is_wicket ? {
           player_id: currentBatter.id,
           ...dismissalData,
@@ -141,7 +170,7 @@ export default function Scoring() {
         setStriker(striker === 'batter1' ? 'batter2' : 'batter1')
       }
 
-      // Reset ball data
+      // Reset all ball data
       setBallData({
         runs: 0,
         is_extra: false,
@@ -149,6 +178,8 @@ export default function Scoring() {
         extra_runs: 0,
         is_wicket: false,
       })
+      setWagonWheelData(null)
+      setPitchMapData(null)
 
       // If wicket, reset batter
       if (ballData.is_wicket) {
@@ -159,6 +190,9 @@ export default function Scoring() {
         }
         setShowDismissalModal(false)
       }
+
+      // Close visualization modal if open
+      setShowVisualizationModal(false)
 
       // Reload match state
       loadMatch()
@@ -353,6 +387,37 @@ export default function Scoring() {
           </button>
         </div>
 
+        {/* Wagon Wheel & Pitch Map Button */}
+        <div className="mb-4">
+          <button
+            onClick={() => setShowVisualizationModal(true)}
+            className={`w-full py-3 rounded font-bold transition flex items-center justify-center space-x-2 ${
+              wagonWheelData || pitchMapData
+                ? 'bg-blue-600 text-white'
+                : 'bg-dark-100 hover:bg-dark-50'
+            }`}
+          >
+            <Target size={18} />
+            <span>
+              {wagonWheelData || pitchMapData
+                ? 'Shot & Line/Length Marked'
+                : 'Mark Shot & Line/Length (Optional)'}
+            </span>
+          </button>
+          {(wagonWheelData || pitchMapData) && (
+            <div className="mt-2 text-xs text-gray-400 space-y-1">
+              {wagonWheelData && (
+                <div>Shot: {wagonWheelData.zone.replace('_', ' ')}</div>
+              )}
+              {pitchMapData && (
+                <div>
+                  Line: {pitchMapData.line}, Length: {pitchMapData.length}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Record Ball Button */}
         <div className="flex space-x-3">
           <button onClick={recordBall} className="btn-primary flex-1">
@@ -445,6 +510,84 @@ export default function Scoring() {
                   Confirm
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wagon Wheel & Pitch Map Visualization Modal */}
+      {showVisualizationModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="card max-w-4xl w-full my-8">
+            <h2 className="text-2xl font-bold mb-4">
+              Mark Shot Location & Bowling Line/Length (Optional)
+            </h2>
+            <p className="text-gray-400 text-sm mb-6">
+              Click on the field to mark where the ball was hit, and on the pitch to mark line and length.
+              You can skip this and proceed to record the ball.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Wagon Wheel */}
+              <div>
+                <h3 className="font-semibold mb-3 text-center">
+                  Shot Location (Wagon Wheel)
+                </h3>
+                <div className="flex justify-center">
+                  <WagonWheel
+                    interactive={true}
+                    onSelect={(data) => setWagonWheelData(data)}
+                    size={300}
+                  />
+                </div>
+                {wagonWheelData && (
+                  <div className="mt-3 p-3 bg-green-900/20 border border-green-700 rounded text-center">
+                    <p className="text-sm text-green-200">
+                      ✓ Shot marked: {wagonWheelData.zone.replace('_', ' ')}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Pitch Map */}
+              <div>
+                <h3 className="font-semibold mb-3 text-center">
+                  Bowling Line & Length (Pitch Map)
+                </h3>
+                <div className="flex justify-center">
+                  <PitchMap
+                    interactive={true}
+                    onSelect={(data) => setPitchMapData(data)}
+                    width={250}
+                    height={350}
+                  />
+                </div>
+                {pitchMapData && (
+                  <div className="mt-3 p-3 bg-blue-900/20 border border-blue-700 rounded text-center">
+                    <p className="text-sm text-blue-200">
+                      ✓ Line: {pitchMapData.line}, Length: {pitchMapData.length}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex space-x-3">
+              <button
+                onClick={() => {
+                  setWagonWheelData(null)
+                  setPitchMapData(null)
+                }}
+                className="btn-secondary flex-1"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={() => setShowVisualizationModal(false)}
+                className="btn-primary flex-1"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>

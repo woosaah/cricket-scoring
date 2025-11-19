@@ -4,6 +4,8 @@ import { matches, teams, scoring } from '../lib/api'
 import { Undo, Target } from 'lucide-react'
 import WagonWheel from '../components/WagonWheel'
 import PitchMap from '../components/PitchMap'
+import { MilestoneToastContainer } from '../components/MilestoneToast'
+import { checkBattingMilestones, checkBowlingMilestones, Milestone } from '../utils/milestones'
 
 export default function Scoring() {
   const { id } = useParams()
@@ -46,6 +48,18 @@ export default function Scoring() {
     line: string
     length: string
   } | null>(null)
+
+  // Milestone notifications
+  const [milestones, setMilestones] = useState<Milestone[]>([])
+  const [previousStats, setPreviousStats] = useState<{
+    batter1Runs: number
+    batter2Runs: number
+    bowlerWickets: number
+  }>({
+    batter1Runs: 0,
+    batter2Runs: 0,
+    bowlerWickets: 0,
+  })
 
   useEffect(() => {
     loadMatch()
@@ -224,11 +238,80 @@ export default function Scoring() {
       // Close visualization modal if open
       setShowVisualizationModal(false)
 
-      // Reload match state
-      loadMatch()
+      // Reload match state and check milestones
+      await loadMatch()
+      checkMilestones()
     } catch (error) {
       console.error('Error recording ball:', error)
       alert('Failed to record ball')
+    }
+  }
+
+  const checkMilestones = async () => {
+    if (!currentInnings) return
+
+    try {
+      // Get updated innings state with player stats
+      const response = await scoring.getInningsState(currentInnings.id)
+      const inningsState = response.data
+
+      const newMilestones: Milestone[] = []
+
+      // Check batting milestones for both batters
+      if (batter1) {
+        const batter1Stats = inningsState.batters?.find((b: any) => b.id === batter1.id)
+        if (batter1Stats) {
+          const battingMilestones = checkBattingMilestones(
+            batter1.name,
+            batter1Stats.runs_scored || 0,
+            previousStats.batter1Runs,
+            batter1Stats.balls_faced || 0,
+            batter1Stats.fours || 0,
+            batter1Stats.sixes || 0
+          )
+          newMilestones.push(...battingMilestones)
+          setPreviousStats((prev) => ({ ...prev, batter1Runs: batter1Stats.runs_scored || 0 }))
+        }
+      }
+
+      if (batter2) {
+        const batter2Stats = inningsState.batters?.find((b: any) => b.id === batter2.id)
+        if (batter2Stats) {
+          const battingMilestones = checkBattingMilestones(
+            batter2.name,
+            batter2Stats.runs_scored || 0,
+            previousStats.batter2Runs,
+            batter2Stats.balls_faced || 0,
+            batter2Stats.fours || 0,
+            batter2Stats.sixes || 0
+          )
+          newMilestones.push(...battingMilestones)
+          setPreviousStats((prev) => ({ ...prev, batter2Runs: batter2Stats.runs_scored || 0 }))
+        }
+      }
+
+      // Check bowling milestones
+      if (bowler) {
+        const bowlerStats = inningsState.overs?.find((o: any) => o.bowler_id === bowler.id)
+        if (bowlerStats) {
+          const bowlingMilestones = checkBowlingMilestones(
+            bowler.name,
+            bowlerStats.wickets_taken || 0,
+            previousStats.bowlerWickets,
+            bowlerStats.runs_conceded || 0,
+            bowlerStats.overs_bowled || 0
+          )
+          newMilestones.push(...bowlingMilestones)
+          setPreviousStats((prev) => ({ ...prev, bowlerWickets: bowlerStats.wickets_taken || 0 }))
+        }
+      }
+
+      // Show milestone toasts
+      if (newMilestones.length > 0) {
+        setMilestones((prev) => [...prev, ...newMilestones])
+      }
+    } catch (error) {
+      console.error('Error checking milestones:', error)
     }
   }
 
@@ -650,6 +733,14 @@ export default function Scoring() {
           </div>
         </div>
       )}
+
+      {/* Milestone Toast Notifications */}
+      <MilestoneToastContainer
+        milestones={milestones}
+        onRemove={(index) => {
+          setMilestones((prev) => prev.filter((_, i) => i !== index))
+        }}
+      />
     </div>
   )
 }

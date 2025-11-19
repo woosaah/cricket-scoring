@@ -16,6 +16,7 @@ import matchesRoutes from './routes/matches.routes';
 import scoringRoutes from './routes/scoring.routes';
 import overlayRoutes from './routes/overlay.routes';
 import analyticsRoutes from './routes/analytics.routes';
+import matchRulesRoutes from './routes/matchRules.routes';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/matches', matchesRoutes);
 app.use('/api/scoring', scoringRoutes);
 app.use('/api/overlay', overlayRoutes);  // For OBS and live streaming
 app.use('/api/analytics', analyticsRoutes);  // For graphs and analytics
+app.use('/api/match-rules', matchRulesRoutes);  // For match rules configuration
 
 // Socket.io for real-time updates
 io.on('connection', (socket) => {

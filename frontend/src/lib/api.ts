@@ -91,4 +91,16 @@ export const analytics = {
   getPlayerForm: (playerId: number) => api.get(`/analytics/player/${playerId}/form`),
 }
 
+// Match Rules
+export const matchRules = {
+  getAll: () => api.get('/match-rules'),
+  getById: (id: number) => api.get(`/match-rules/${id}`),
+  getForMatch: (matchId: number) => api.get(`/match-rules/match/${matchId}`),
+  create: (data: any) => api.post('/match-rules', data),
+  update: (id: number, data: any) => api.put(`/match-rules/${id}`, data),
+  delete: (id: number) => api.delete(`/match-rules/${id}`),
+  applyToMatch: (ruleId: number, matchId: number) =>
+    api.post(`/match-rules/apply/${ruleId}/match/${matchId}`),
+}
+
 export default api

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { tournaments, teams, matches } from '../lib/api'
+import MatchRulesSelector from '../components/MatchRulesSelector'
 
 export default function MatchSetup() {
   const navigate = useNavigate()
@@ -18,8 +19,7 @@ export default function MatchSetup() {
     home_team_id: '',
     away_team_id: '',
     match_date: new Date().toISOString().slice(0, 16),
-    format: 'T20',
-    overs_per_innings: 20,
+    match_rules_id: null as number | null,
     venue: '',
   })
 
@@ -49,8 +49,7 @@ export default function MatchSetup() {
           home_team_id: match.home_team_id.toString(),
           away_team_id: match.away_team_id.toString(),
           match_date: match.match_date || new Date().toISOString().slice(0, 16),
-          format: match.format,
-          overs_per_innings: match.overs_per_innings,
+          match_rules_id: match.match_rules_id || null,
           venue: match.venue || '',
         })
         setCreatedMatchId(match.id)
@@ -165,34 +164,11 @@ export default function MatchSetup() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Format</label>
-              <select
-                value={formData.format}
-                onChange={(e) => {
-                  const overs = e.target.value === 'T20' ? 20 : e.target.value === 'T40' ? 40 : 50
-                  setFormData({ ...formData, format: e.target.value, overs_per_innings: overs })
-                }}
-                className="input w-full"
-              >
-                <option value="T20">T20</option>
-                <option value="T40">T40</option>
-                <option value="T50">T50</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Overs per Innings</label>
-              <input
-                type="number"
-                value={formData.overs_per_innings}
-                onChange={(e) => setFormData({ ...formData, overs_per_innings: parseInt(e.target.value) })}
-                className="input w-full"
-                required
-              />
-            </div>
-          </div>
+          <MatchRulesSelector
+            selectedRuleId={formData.match_rules_id}
+            onSelect={(ruleId) => setFormData({ ...formData, match_rules_id: ruleId })}
+            showCustom={true}
+          />
 
           <div>
             <label className="label">Match Date & Time</label>

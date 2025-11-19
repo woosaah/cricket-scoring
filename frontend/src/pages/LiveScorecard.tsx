@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { matches, scoring } from '../lib/api'
-import { RefreshCw } from 'lucide-react'
+import { matches, scoring, analytics } from '../lib/api'
+import { RefreshCw, Download } from 'lucide-react'
 import WagonWheel from '../components/WagonWheel'
 import PitchMap from '../components/PitchMap'
+import PartnershipChart from '../components/PartnershipChart'
+import WormGraph from '../components/WormGraph'
+import ManhattanChart from '../components/ManhattanChart'
+import { generateScorecardPDF } from '../utils/pdfExport'
 
 export default function LiveScorecard() {
   const { id } = useParams()
@@ -11,8 +15,13 @@ export default function LiveScorecard() {
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [inningsData, setInningsData] = useState<any[]>([])
+  const [wormGraphData, setWormGraphData] = useState<any[]>([])
   const [showWagonWheel, setShowWagonWheel] = useState<number | null>(null)
   const [showPitchMap, setShowPitchMap] = useState<number | null>(null)
+  const [showPartnerships, setShowPartnerships] = useState<number | null>(null)
+  const [showManhattan, setShowManhattan] = useState<number | null>(null)
+  const [showWormGraph, setShowWormGraph] = useState(false)
+  const [exportingPDF, setExportingPDF] = useState(false)
 
   useEffect(() => {
     loadScorecard()
@@ -33,24 +42,56 @@ export default function LiveScorecard() {
       const response = await matches.getScorecard(parseInt(id!))
       setScorecard(response.data)
 
-      // Load innings data with balls for visualizations
+      // Load innings data with balls, partnerships, and Manhattan chart data
       if (response.data.innings) {
-        const inningsWithBalls = await Promise.all(
+        const inningsWithData = await Promise.all(
           response.data.innings.map(async (inning: any) => {
             try {
-              const stateRes = await scoring.getInningsState(inning.id)
-              return { ...inning, balls: stateRes.data?.balls || [] }
+              const [stateRes, partnershipRes, manhattanRes] = await Promise.all([
+                scoring.getInningsState(inning.id),
+                analytics.getPartnerships(inning.id),
+                analytics.getManhattan(inning.id),
+              ])
+              return {
+                ...inning,
+                balls: stateRes.data?.balls || [],
+                partnerships: partnershipRes.data || [],
+                manhattanData: manhattanRes.data || [],
+              }
             } catch {
-              return { ...inning, balls: [] }
+              return { ...inning, balls: [], partnerships: [], manhattanData: [] }
             }
           })
         )
-        setInningsData(inningsWithBalls)
+        setInningsData(inningsWithData)
+
+        // Load worm graph data for the match
+        try {
+          const wormRes = await analytics.getWormGraph(parseInt(id!))
+          setWormGraphData(wormRes.data || [])
+        } catch {
+          setWormGraphData([])
+        }
       }
     } catch (error) {
       console.error('Error loading scorecard:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleExportPDF = () => {
+    if (!scorecard) return
+
+    setExportingPDF(true)
+    try {
+      const filename = generateScorecardPDF(scorecard)
+      console.log(`PDF exported: ${filename}`)
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+      alert('Failed to export PDF. Please try again.')
+    } finally {
+      setExportingPDF(false)
     }
   }
 
@@ -77,6 +118,15 @@ export default function LiveScorecard() {
           </div>
           <div className="flex items-center space-x-3">
             <button
+              onClick={handleExportPDF}
+              disabled={exportingPDF || !innings || innings.length === 0}
+              className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export scorecard as PDF"
+            >
+              <Download size={16} />
+              <span className="hidden sm:inline">{exportingPDF ? 'Exporting...' : 'Export PDF'}</span>
+            </button>
+            <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={`btn-secondary flex items-center space-x-2 ${
                 autoRefresh ? 'bg-green-900/50' : ''
@@ -100,6 +150,32 @@ export default function LiveScorecard() {
           {match.status.replace('_', ' ')}
         </div>
       </div>
+
+      {/* Worm Graph - Match Run Rate Comparison */}
+      {wormGraphData.length > 0 && innings.length > 0 && (
+        <div className="card">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold">Run Rate Comparison</h3>
+            <button
+              onClick={() => setShowWormGraph(!showWormGraph)}
+              className="text-sm text-primary hover:underline"
+            >
+              {showWormGraph ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          {showWormGraph && (
+            <WormGraph
+              innings1Data={wormGraphData[0]?.data || []}
+              innings2Data={wormGraphData[1]?.data || []}
+              team1Name={innings[0]?.batting_team_name || 'Team 1'}
+              team2Name={innings[1]?.batting_team_name || 'Team 2'}
+              team1Color="#dc2626"
+              team2Color="#3b82f6"
+              targetScore={innings.length > 1 ? innings[0].total_runs : undefined}
+            />
+          )}
+        </div>
+      )}
 
       {/* Innings Scorecards */}
       {innings.map((inning: any, index: number) => (
@@ -281,6 +357,53 @@ export default function LiveScorecard() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Partnerships */}
+          {inningsData[index] && inningsData[index].partnerships && inningsData[index].partnerships.length > 0 && (
+            <div className="card">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold">Partnerships</h3>
+                <button
+                  onClick={() =>
+                    setShowPartnerships(showPartnerships === index ? null : index)
+                  }
+                  className="text-sm text-primary hover:underline"
+                >
+                  {showPartnerships === index ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {showPartnerships === index && (
+                <PartnershipChart
+                  partnerships={inningsData[index].partnerships}
+                  teamColor="#dc2626"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Manhattan Chart - Runs Per Over */}
+          {inningsData[index] && inningsData[index].manhattanData && inningsData[index].manhattanData.length > 0 && (
+            <div className="card">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-semibold">Runs Per Over</h3>
+                <button
+                  onClick={() =>
+                    setShowManhattan(showManhattan === index ? null : index)
+                  }
+                  className="text-sm text-primary hover:underline"
+                >
+                  {showManhattan === index ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              {showManhattan === index && (
+                <ManhattanChart
+                  data={inningsData[index].manhattanData}
+                  teamName={inning.batting_team_name}
+                  teamColor="#dc2626"
+                />
+              )}
             </div>
           )}
         </div>

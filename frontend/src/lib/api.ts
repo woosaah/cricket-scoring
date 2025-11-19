@@ -83,4 +83,12 @@ export const scoring = {
     api.put(`/scoring/innings/${inningsId}/end`),
 }
 
+// Analytics
+export const analytics = {
+  getWormGraph: (matchId: number) => api.get(`/analytics/match/${matchId}/worm-graph`),
+  getManhattan: (inningsId: number) => api.get(`/analytics/innings/${inningsId}/manhattan`),
+  getPartnerships: (inningsId: number) => api.get(`/analytics/innings/${inningsId}/partnerships`),
+  getPlayerForm: (playerId: number) => api.get(`/analytics/player/${playerId}/form`),
+}
+
 export default api

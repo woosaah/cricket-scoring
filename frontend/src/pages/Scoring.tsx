@@ -165,8 +165,38 @@ export default function Scoring() {
         } : null,
       })
 
-      // Swap striker if odd runs or if it's the end of the over
-      if (ballData.runs % 2 === 1 || ballNumber === 6) {
+      // Cricket rules for striker rotation
+      let shouldSwapStriker = false
+      const totalRuns = ballData.runs + (ballData.extra_runs || 0)
+      const isWide = ballData.is_extra && ballData.extra_type === 'wide'
+      const isNoball = ballData.is_extra && ballData.extra_type === 'noball'
+      const isBye = ballData.is_extra && (ballData.extra_type === 'bye' || ballData.extra_type === 'legbye')
+
+      // Determine if this is a valid ball (counts toward over)
+      const isValidBall = !isWide && !isNoball
+
+      // Calculate next ball number
+      let nextBallNumber = ballNumber
+      if (isValidBall) {
+        nextBallNumber = ballNumber === 6 ? 1 : ballNumber + 1
+      }
+
+      // Striker rotation rules:
+      // 1. Swap on odd total runs (1, 3, 5) from any scoring shot
+      if (totalRuns % 2 === 1) {
+        shouldSwapStriker = true
+      }
+
+      // 2. If it's the last ball of the over (and it's a valid ball), swap for next over
+      if (isValidBall && ballNumber === 6) {
+        shouldSwapStriker = true
+      }
+
+      // 3. Special handling for wides and no-balls:
+      //    - If wide/no-ball + odd runs (1, 3), the runs cause a swap
+      //    - This is already handled by totalRuns % 2 check above
+
+      if (shouldSwapStriker) {
         setStriker(striker === 'batter1' ? 'batter2' : 'batter1')
       }
 
@@ -252,8 +282,22 @@ export default function Scoring() {
               </option>
             ))}
           </select>
-          <div className="mt-2 text-sm text-gray-400">
-            {striker === 'batter1' && '⚡ On Strike'}
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              {striker === 'batter1' && '⚡ On Strike'}
+            </div>
+            {batter1 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Retire ${batter1.name}?`)) {
+                    setBatter1(null)
+                  }
+                }}
+                className="text-xs text-yellow-500 hover:text-yellow-400"
+              >
+                Retire
+              </button>
+            )}
           </div>
         </div>
 
@@ -275,8 +319,22 @@ export default function Scoring() {
               </option>
             ))}
           </select>
-          <div className="mt-2 text-sm text-gray-400">
-            {striker === 'batter2' && '⚡ On Strike'}
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              {striker === 'batter2' && '⚡ On Strike'}
+            </div>
+            {batter2 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Retire ${batter2.name}?`)) {
+                    setBatter2(null)
+                  }
+                }}
+                className="text-xs text-yellow-500 hover:text-yellow-400"
+              >
+                Retire
+              </button>
+            )}
           </div>
         </div>
 

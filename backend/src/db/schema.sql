@@ -163,11 +163,12 @@ CREATE TABLE dismissals (
   id SERIAL PRIMARY KEY,
   ball_id INTEGER REFERENCES balls(id) ON DELETE CASCADE,
   player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
-  dismissal_type VARCHAR(20) CHECK (dismissal_type IN ('bowled', 'caught', 'lbw', 'stumped', 'run_out', 'hit_wicket', 'retired_hurt', 'timed_out')),
+  dismissal_type VARCHAR(20) CHECK (dismissal_type IN ('bowled', 'caught', 'lbw', 'stumped', 'run_out', 'hit_wicket', 'retired_hurt', 'retired_out', 'timed_out')),
   fielder_id INTEGER REFERENCES players(id),
   bowler_id INTEGER REFERENCES players(id),
   runs_scored INTEGER DEFAULT 0,
   balls_faced INTEGER DEFAULT 0,
+  can_return BOOLEAN DEFAULT false,  -- For retired hurt, allows batter to return
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
